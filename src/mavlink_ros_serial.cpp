@@ -82,7 +82,7 @@ bool pc2serial = true;			  ///< Enable PC to serial push mode (send more stuff f
 int fd;
 
 /**
- * Grabs all mavlink-messages from the ROS-Topic "mavlink" and publishes them on the LCM-Mavlink-Channel
+ * Grabs all mavlink-messages from the ROS-Topic "mavlink" and publishes them on ROS
  */
 
 ros::Subscriber mavlink_sub;
@@ -325,17 +325,11 @@ void* serial_wait(void* serial_ptr)
 			rosmavlink_msg.sysid = message.sysid;
 			rosmavlink_msg.compid = message.compid;
 			rosmavlink_msg.msgid = message.msgid;
-			rosmavlink_msg.fromlcm = false;
 
 			for (int i = 0; i < message.len/8; i++)
 			{
 				(rosmavlink_msg.payload64).push_back(message.payload64[i]);
 			}
-			
-			/**
-			 * Mark the ROS-Message as coming not from LCM
-			 */
-			rosmavlink_msg.fromlcm = true;
 			
 			/**
 			 * Send the received MAVLink message to ROS (topic: mavlink, see main())
@@ -344,16 +338,58 @@ void* serial_wait(void* serial_ptr)
 
 			switch(message.msgid)
 			{
+			/* 
+			 * Message specs (xxx: soon mavlink.org):
+			 * https://pixhawk.ethz.ch/mavlink/#ATTITUDE
+			 */
 			case MAVLINK_MSG_ID_ATTITUDE:
 				{
-				        sensor_msgs::Imu imu_msg;
-				        //convertMavlinkAttitudeToROS(&message, imu_msg);
-				        attitude_pub.publish(imu_msg);
+					sensor_msgs::Imu imu_msg;
+
+					/* decode message */
+					mavlink_attitude_t att;
+					mavlink_msg_attitude_decode(&message, &att);
+
+					/* att struct now filled with data */
+					//convertMavlinkAttitudeToROS(&message, imu_msg);
+
+					// SCHOOOOOF
+
+					attitude_pub.publish(imu_msg);
 
 					if (verbose)
 						ROS_INFO("Published IMU message (sys:%d|comp:%d):\n", message.sysid, message.compid);
 				}
 				break;
+
+			/* 
+			 * Message specs (xxx: soon mavlink.org):
+			 * https://pixhawk.ethz.ch/mavlink/#HIGHRES_IMU
+			 */
+			case MAVLINK_MSG_ID_HIGHRES_IMU:
+				{
+					/* decode message */
+					mavlink_highres_imu_t raw;
+					mavlink_msg_highres_imu_decode(&message, &raw);
+
+					// XXX
+				}
+				break;
+
+			/* 
+			 * Message specs (xxx: soon mavlink.org):
+			 * https://pixhawk.ethz.ch/mavlink/#OPTICAL_FLOW
+			 */
+			case MAVLINK_MSG_ID_OPTICAL_FLOW:
+				{
+					/* decode message */
+					mavlink_optical_flow_t flow;
+					mavlink_msg_optical_flow_decode(&message, &flow);
+
+					// XXX
+				}
+				break;
+
 			}
 		}
 	}
@@ -363,9 +399,6 @@ void* serial_wait(void* serial_ptr)
 
 void mavlinkCallback(const mavlink_ros::Mavlink &mavlink_ros_msg)
 {
-	//Check if the message is coming from lcm so that it is not send back
-	if (mavlink_ros_msg.fromlcm)
-		return;
 
 	/**
 	 * Convert mavlink_ros::Mavlink to mavlink_message_t
@@ -381,9 +414,9 @@ void mavlinkCallback(const mavlink_ros::Mavlink &mavlink_ros_msg)
 	mavlink_finalize_message_chan(&msg, mavlink_ros_msg.sysid, mavlink_ros_msg.compid, MAVLINK_COMM_0, mavlink_ros_msg.len, mavlink_crcs[msg.msgid]);
 
 	/**
-	 * Send mavlink_message to LCM (so that the rest of the MAVConn world can hear us)
+	 * Send mavlink_message to UART
 	 */
-	if (verbose) ROS_INFO("Sent Mavlink from ROS to LCM, Message-ID: [%i]", mavlink_ros_msg.msgid);
+	if (verbose) ROS_INFO("Sent Mavlink from ROS to UART, Message-ID: [%i]", mavlink_ros_msg.msgid);
 
 	// Send message over serial port
 	static uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
