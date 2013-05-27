@@ -119,16 +119,16 @@ int open_port(std::string& port)
 bool setup_port(int fd, int baud, int data_bits, int stop_bits, bool parity, bool hardware_control)
 {
 	//struct termios options;
-	
+
 	struct termios  config;
 	if(!isatty(fd))
 	{
-		fprintf(stderr, "\nERROR: file descriptor %s is NOT a serial port\n", port.c_str());
+		fprintf(stderr, "\nERROR: file descriptor %d is NOT a serial port\n", fd);
 		return false;
 	}
 	if(tcgetattr(fd, &config) < 0)
 	{
-		fprintf(stderr, "\nERROR: could not read configuration of port %s\n", port.c_str());
+		fprintf(stderr, "\nERROR: could not read configuration of fd %d\n", fd);
 		return false;
 	}
 	//
@@ -147,9 +147,17 @@ bool setup_port(int fd, int baud, int data_bits, int stop_bits, bool parity, boo
 	// no Ctrl-D suppression, no fill characters, no case mapping,
 	// no local output processing
 	//
-	// config.c_oflag &= ~(OCRNL | ONLCR | ONLRET |
-	//                     ONOCR | ONOEOT| OFILL | OLCUC | OPOST);
-	config.c_oflag = 0;
+	config.c_oflag &= ~(OCRNL | ONLCR | ONLRET |
+	                     ONOCR | OFILL | OPOST);
+
+	#ifdef OLCUC 
+  		config.c_oflag &= ~OLCUC; 
+	#endif
+
+  	#ifdef ONOEOT
+  		config.c_oflag &= ~ONOEOT;
+  	#endif
+
 	//
 	// No line processing:
 	// echo off, echo newline off, canonical mode off,
@@ -169,10 +177,10 @@ bool setup_port(int fd, int baud, int data_bits, int stop_bits, bool parity, boo
 	//
 	config.c_cc[VMIN]  = 1;
 	config.c_cc[VTIME] = 10; // was 0
-	
+
 	// Get the current options for the port
 	//tcgetattr(fd, &options);
-	
+
 	switch (baud)
 	{
 		case 1200:
@@ -215,20 +223,36 @@ bool setup_port(int fd, int baud, int data_bits, int stop_bits, bool parity, boo
 				return false;
 			}
 			break;
+
+		// These two non-standard (by the 70'ties ) rates are fully supported on
+		// current Debian and Mac OS versions (tested since 2010).
+		case 460800:
+			if (cfsetispeed(&config, 460800) < 0 || cfsetospeed(&config, 460800) < 0)
+			{
+				fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
+				return false;
+			}
+			break;
+		case 921600:
+			if (cfsetispeed(&config, 921600) < 0 || cfsetospeed(&config, 921600) < 0)
+			{
+				fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
+				return false;
+			}
+			break;
 		default:
-			fprintf(stderr, "ERROR: Desired baud rate %d could not be set, falling back to 115200 8N1 default rate.\n", baud);
-			cfsetispeed(&config, B115200);
-			cfsetospeed(&config, B115200);
-			
+			fprintf(stderr, "ERROR: Desired baud rate %d could not be set, aborting.\n", baud);
+			return false;
+
 			break;
 	}
-	
+
 	//
 	// Finally, apply the configuration
 	//
 	if(tcsetattr(fd, TCSAFLUSH, &config) < 0)
 	{
-		fprintf(stderr, "\nERROR: could not set configuration of port %s\n", port.c_str());
+		fprintf(stderr, "\nERROR: could not set configuration of fd %d\n", fd);
 		return false;
 	}
 	return true;
