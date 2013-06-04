@@ -21,7 +21,6 @@
  
  ======================================================================*/
 
-
 /**
  * @file
  *   @brief The serial interface process
@@ -129,170 +128,168 @@ inline void angle2quaternion(const double &roll, const double &pitch, const doub
 
 int open_port(std::string& port)
 {
-	int fd; /* File descriptor for the port */
-	
-	// Open serial port
-	// O_RDWR - Read and write
-	// O_NOCTTY - Ignore special chars like CTRL-C
-	fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
-	if (fd == -1)
-	{
-		/* Could not open the port. */
-		return(-1);
-	}
-	else
-	{
-		fcntl(fd, F_SETFL, 0);
-	}
-	
-	return (fd);
+  int fd; /* File descriptor for the port */
+
+  // Open serial port
+  // O_RDWR - Read and write
+  // O_NOCTTY - Ignore special chars like CTRL-C
+  fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
+  if (fd == -1)
+  {
+    /* Could not open the port. */
+    return (-1);
+  }
+  else
+  {
+    fcntl(fd, F_SETFL, 0);
+  }
+
+  return (fd);
 }
 
 bool setup_port(int fd, int baud, int data_bits, int stop_bits, bool parity, bool hardware_control)
 {
-	//struct termios options;
+  //struct termios options;
 
-	struct termios  config;
-	if(!isatty(fd))
-	{
-		fprintf(stderr, "\nERROR: file descriptor %d is NOT a serial port\n", fd);
-		return false;
-	}
-	if(tcgetattr(fd, &config) < 0)
-	{
-		fprintf(stderr, "\nERROR: could not read configuration of fd %d\n", fd);
-		return false;
-	}
-	//
-	// Input flags - Turn off input processing
-	// convert break to null byte, no CR to NL translation,
-	// no NL to CR translation, don't mark parity errors or breaks
-	// no input parity check, don't strip high bit off,
-	// no XON/XOFF software flow control
-	//
-	config.c_iflag &= ~(IGNBRK | BRKINT | ICRNL |
-	                    INLCR | PARMRK | INPCK | ISTRIP | IXON);
-	//
-	// Output flags - Turn off output processing
-	// no CR to NL translation, no NL to CR-NL translation,
-	// no NL to CR translation, no column 0 CR suppression,
-	// no Ctrl-D suppression, no fill characters, no case mapping,
-	// no local output processing
-	//
-	config.c_oflag &= ~(OCRNL | ONLCR | ONLRET |
-	                     ONOCR | OFILL | OPOST);
+  struct termios config;
+  if (!isatty(fd))
+  {
+    fprintf(stderr, "\nERROR: file descriptor %d is NOT a serial port\n", fd);
+    return false;
+  }
+  if (tcgetattr(fd, &config) < 0)
+  {
+    fprintf(stderr, "\nERROR: could not read configuration of fd %d\n", fd);
+    return false;
+  }
+  //
+  // Input flags - Turn off input processing
+  // convert break to null byte, no CR to NL translation,
+  // no NL to CR translation, don't mark parity errors or breaks
+  // no input parity check, don't strip high bit off,
+  // no XON/XOFF software flow control
+  //
+  config.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK | ISTRIP | IXON);
+  //
+  // Output flags - Turn off output processing
+  // no CR to NL translation, no NL to CR-NL translation,
+  // no NL to CR translation, no column 0 CR suppression,
+  // no Ctrl-D suppression, no fill characters, no case mapping,
+  // no local output processing
+  //
+  config.c_oflag &= ~(OCRNL | ONLCR | ONLRET | ONOCR | OFILL | OPOST);
 
-	#ifdef OLCUC 
-  		config.c_oflag &= ~OLCUC; 
-	#endif
+#ifdef OLCUC
+  config.c_oflag &= ~OLCUC;
+#endif
 
-  	#ifdef ONOEOT
-  		config.c_oflag &= ~ONOEOT;
-  	#endif
+#ifdef ONOEOT
+  config.c_oflag &= ~ONOEOT;
+#endif
 
-	//
-	// No line processing:
-	// echo off, echo newline off, canonical mode off,
-	// extended input processing off, signal chars off
-	//
-	config.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG);
-	//
-	// Turn off character processing
-	// clear current char size mask, no parity checking,
-	// no output processing, force 8 bit input
-	//
-	config.c_cflag &= ~(CSIZE | PARENB);
-	config.c_cflag |= CS8;
-	//
-	// One input byte is enough to return from read()
-	// Inter-character timer off
-	//
-	config.c_cc[VMIN]  = 1;
-	config.c_cc[VTIME] = 10; // was 0
+  //
+  // No line processing:
+  // echo off, echo newline off, canonical mode off,
+  // extended input processing off, signal chars off
+  //
+  config.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG);
+  //
+  // Turn off character processing
+  // clear current char size mask, no parity checking,
+  // no output processing, force 8 bit input
+  //
+  config.c_cflag &= ~(CSIZE | PARENB);
+  config.c_cflag |= CS8;
+  //
+  // One input byte is enough to return from read()
+  // Inter-character timer off
+  //
+  config.c_cc[VMIN] = 1;
+  config.c_cc[VTIME] = 10; // was 0
 
-	// Get the current options for the port
-	//tcgetattr(fd, &options);
+  // Get the current options for the port
+  //tcgetattr(fd, &options);
 
-	switch (baud)
-	{
-		case 1200:
-			if (cfsetispeed(&config, B1200) < 0 || cfsetospeed(&config, B1200) < 0)
-			{
-				fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
-				return false;
-			}
-			break;
-		case 1800:
-			cfsetispeed(&config, B1800);
-			cfsetospeed(&config, B1800);
-			break;
-		case 9600:
-			cfsetispeed(&config, B9600);
-			cfsetospeed(&config, B9600);
-			break;
-		case 19200:
-			cfsetispeed(&config, B19200);
-			cfsetospeed(&config, B19200);
-			break;
-		case 38400:
-			if (cfsetispeed(&config, B38400) < 0 || cfsetospeed(&config, B38400) < 0)
-			{
-				fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
-				return false;
-			}
-			break;
-		case 57600:
-			if (cfsetispeed(&config, B57600) < 0 || cfsetospeed(&config, B57600) < 0)
-			{
-				fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
-				return false;
-			}
-			break;
-		case 115200:
-			if (cfsetispeed(&config, B115200) < 0 || cfsetospeed(&config, B115200) < 0)
-			{
-				fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
-				return false;
-			}
-			break;
+  switch (baud)
+  {
+    case 1200:
+      if (cfsetispeed(&config, B1200) < 0 || cfsetospeed(&config, B1200) < 0)
+      {
+        fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
+        return false;
+      }
+      break;
+    case 1800:
+      cfsetispeed(&config, B1800);
+      cfsetospeed(&config, B1800);
+      break;
+    case 9600:
+      cfsetispeed(&config, B9600);
+      cfsetospeed(&config, B9600);
+      break;
+    case 19200:
+      cfsetispeed(&config, B19200);
+      cfsetospeed(&config, B19200);
+      break;
+    case 38400:
+      if (cfsetispeed(&config, B38400) < 0 || cfsetospeed(&config, B38400) < 0)
+      {
+        fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
+        return false;
+      }
+      break;
+    case 57600:
+      if (cfsetispeed(&config, B57600) < 0 || cfsetospeed(&config, B57600) < 0)
+      {
+        fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
+        return false;
+      }
+      break;
+    case 115200:
+      if (cfsetispeed(&config, B115200) < 0 || cfsetospeed(&config, B115200) < 0)
+      {
+        fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
+        return false;
+      }
+      break;
 
-		// These two non-standard (by the 70'ties ) rates are fully supported on
-		// current Debian and Mac OS versions (tested since 2010).
-		case 460800:
-			if (cfsetispeed(&config, 460800) < 0 || cfsetospeed(&config, 460800) < 0)
-			{
-				fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
-				return false;
-			}
-			break;
-		case 921600:
-			if (cfsetispeed(&config, 921600) < 0 || cfsetospeed(&config, 921600) < 0)
-			{
-				fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
-				return false;
-			}
-			break;
-		default:
-			fprintf(stderr, "ERROR: Desired baud rate %d could not be set, aborting.\n", baud);
-			return false;
+      // These two non-standard (by the 70'ties ) rates are fully supported on
+      // current Debian and Mac OS versions (tested since 2010).
+    case 460800:
+      if (cfsetispeed(&config, 460800) < 0 || cfsetospeed(&config, 460800) < 0)
+      {
+        fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
+        return false;
+      }
+      break;
+    case 921600:
+      if (cfsetispeed(&config, 921600) < 0 || cfsetospeed(&config, 921600) < 0)
+      {
+        fprintf(stderr, "\nERROR: Could not set desired baud rate of %d Baud\n", baud);
+        return false;
+      }
+      break;
+    default:
+      fprintf(stderr, "ERROR: Desired baud rate %d could not be set, aborting.\n", baud);
+      return false;
 
-			break;
-	}
+      break;
+  }
 
-	//
-	// Finally, apply the configuration
-	//
-	if(tcsetattr(fd, TCSAFLUSH, &config) < 0)
-	{
-		fprintf(stderr, "\nERROR: could not set configuration of fd %d\n", fd);
-		return false;
-	}
-	return true;
+  //
+  // Finally, apply the configuration
+  //
+  if (tcsetattr(fd, TCSAFLUSH, &config) < 0)
+  {
+    fprintf(stderr, "\nERROR: could not set configuration of fd %d\n", fd);
+    return false;
+  }
+  return true;
 }
 
 void close_port(int fd)
 {
-	close(fd);
+  close(fd);
 }
 
 /**
@@ -303,370 +300,392 @@ void close_port(int fd)
  */
 void* serial_wait(void* serial_ptr)
 {
-	int fd = *((int*) serial_ptr);
-	
-	mavlink_status_t lastStatus;
-	lastStatus.packet_rx_drop_count = 0;
-	
-	// Blocking wait for new data
-	while (1)
-	{
-		//if (debug) printf("Checking for new data on serial port\n");
-		// Block until data is available, read only one byte to be able to continue immediately
-		//char buf[MAVLINK_MAX_PACKET_LEN];
-		uint8_t cp;
-		mavlink_message_t message;
-		mavlink_status_t status;
-		uint8_t msgReceived = false;
-		//tcflush(fd, TCIFLUSH);
-		if (read(fd, &cp, 1) > 0)
-		{
-			// Check if a message could be decoded, return the message in case yes
-			msgReceived = mavlink_parse_char(MAVLINK_COMM_1, cp, &message, &status);
-			if (lastStatus.packet_rx_drop_count != status.packet_rx_drop_count)
-			{
-				if (verbose || debug) printf("ERROR: DROPPED %d PACKETS\n", status.packet_rx_drop_count);
-				if (debug)
-				{
-					unsigned char v=cp;
-					fprintf(stderr,"%02x ", v);
-				}
-			}
-			lastStatus = status;
-		}
-		else
-		{
-			if (!silent) fprintf(stderr, "ERROR: Could not read from port %s\n", port.c_str());
-		}
-		
-		// If a message could be decoded, handle it
-		if(msgReceived)
-		{
-			//if (verbose || debug) std::cout << std::dec << "Received and forwarded serial port message with id " << static_cast<unsigned int>(message.msgid) << " from system " << static_cast<int>(message.sysid) << std::endl;
-			
-			// Do not send images over serial port
-			
-			// DEBUG output
-			if (debug)
-			{
-				fprintf(stderr,"Forwarding SERIAL -> ROS: ");
-				unsigned int i;
-				uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
-				unsigned int messageLength = mavlink_msg_to_send_buffer(buffer, &message);
-				if (messageLength > MAVLINK_MAX_PACKET_LEN)
-				{
-					fprintf(stderr, "\nFATAL ERROR: MESSAGE LENGTH IS LARGER THAN BUFFER SIZE\n");
-				}
-				else
-				{
-					for (i=0; i<messageLength; i++)
-					{
-						unsigned char v=buffer[i];
-						fprintf(stderr,"%02x ", v);
-					}
-					fprintf(stderr,"\n");
-				}
-			}
-			
-			if (verbose || debug)
-				ROS_INFO("Received message from serial with ID #%d (sys:%d|comp:%d):\n", message.msgid, message.sysid, message.compid);
-			
-			/**
-			 * Serialize the Mavlink-ROS-message
-			 */
-			mavlink_ros::Mavlink rosmavlink_msg;
+  int fd = *((int*)serial_ptr);
 
-			rosmavlink_msg.len = message.len;
-			rosmavlink_msg.seq = message.seq;
-			rosmavlink_msg.sysid = message.sysid;
-			rosmavlink_msg.compid = message.compid;
-			rosmavlink_msg.msgid = message.msgid;
+  mavlink_status_t lastStatus;
+  lastStatus.packet_rx_drop_count = 0;
 
-			for (int i = 0; i < message.len/8; i++)
-			{
-				(rosmavlink_msg.payload64).push_back(message.payload64[i]);
-			}
-			
-			/**
-			 * Send the received MAVLink message to ROS (topic: mavlink, see main())
-			 */
-			mavlink_pub.publish(rosmavlink_msg);
+  // Blocking wait for new data
+  while (1)
+  {
+    //if (debug) printf("Checking for new data on serial port\n");
+    // Block until data is available, read only one byte to be able to continue immediately
+    //char buf[MAVLINK_MAX_PACKET_LEN];
+    uint8_t cp;
+    mavlink_message_t message;
+    mavlink_status_t status;
+    uint8_t msgReceived = false;
+    //tcflush(fd, TCIFLUSH);
+    if (read(fd, &cp, 1) > 0)
+    {
+      // Check if a message could be decoded, return the message in case yes
+      msgReceived = mavlink_parse_char(MAVLINK_COMM_1, cp, &message, &status);
+      if (lastStatus.packet_rx_drop_count != status.packet_rx_drop_count)
+      {
+        if (verbose || debug)
+          printf("ERROR: DROPPED %d PACKETS\n", status.packet_rx_drop_count);
+        if (debug)
+        {
+          unsigned char v = cp;
+          fprintf(stderr, "%02x ", v);
+        }
+      }
+      lastStatus = status;
+    }
+    else
+    {
+      if (!silent)
+        fprintf(stderr, "ERROR: Could not read from port %s\n", port.c_str());
+    }
 
-			switch(message.msgid)
-			{
-			/* 
-			 * Message specs (xxx: soon mavlink.org):
-			 * https://pixhawk.ethz.ch/mavlink/#ATTITUDE
-			 */
-			  case MAVLINK_MSG_ID_ATTITUDE:
-			  {
-			    if(imu_pub.getNumSubscribers()>0){
-			      mavlink_attitude_t att;
-			      mavlink_msg_attitude_decode(&message, &att);
+    // If a message could be decoded, handle it
+    if (msgReceived)
+    {
+      //if (verbose || debug) std::cout << std::dec << "Received and forwarded serial port message with id " << static_cast<unsigned int>(message.msgid) << " from system " << static_cast<int>(message.sysid) << std::endl;
 
-			      sensor_msgs::ImuPtr imu_msg(new sensor_msgs::Imu);
+      // Do not send images over serial port
 
-			      angle2quaternion(att.roll, -att.pitch, -att.yaw, &(imu_msg->orientation.w), &(imu_msg->orientation.x), &(imu_msg->orientation.y), &(imu_msg->orientation.z));
+      // DEBUG output
+      if (debug)
+      {
+        fprintf(stderr, "Forwarding SERIAL -> ROS: ");
+        unsigned int i;
+        uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
+        unsigned int messageLength = mavlink_msg_to_send_buffer(buffer, &message);
+        if (messageLength > MAVLINK_MAX_PACKET_LEN)
+        {
+          fprintf(stderr, "\nFATAL ERROR: MESSAGE LENGTH IS LARGER THAN BUFFER SIZE\n");
+        }
+        else
+        {
+          for (i = 0; i < messageLength; i++)
+          {
+            unsigned char v = buffer[i];
+            fprintf(stderr, "%02x ", v);
+          }
+          fprintf(stderr, "\n");
+        }
+      }
 
-			      // TODO: check/verify that these are body-fixed
-			      imu_msg->angular_velocity.x = att.rollspeed;
-			      imu_msg->angular_velocity.y = -att.pitchspeed;
-			      imu_msg->angular_velocity.z = -att.yawspeed;
+      if (verbose || debug)
+        ROS_INFO("Received message from serial with ID #%d (sys:%d|comp:%d):\n", message.msgid, message.sysid,
+                 message.compid);
 
-			      // take this from imu high res message, this is supposed to arrive before this one and should pretty much be in sync then
-			      imu_msg->linear_acceleration.x = imu_raw.xacc;
-			      imu_msg->linear_acceleration.y = -imu_raw.yacc;
-			      imu_msg->linear_acceleration.z = -imu_raw.zacc;
+      /**
+       * Serialize the Mavlink-ROS-message
+       */
+      mavlink_ros::Mavlink rosmavlink_msg;
 
-			      // TODO: can we fill in the covariance here from a parameter that we set from the specs/experience?
-			      for(sensor_msgs::Imu::_orientation_covariance_type::iterator it=imu_msg->orientation_covariance.begin(); it != imu_msg->orientation_covariance.end(); ++it)
-			        *it = 0;
+      rosmavlink_msg.len = message.len;
+      rosmavlink_msg.seq = message.seq;
+      rosmavlink_msg.sysid = message.sysid;
+      rosmavlink_msg.compid = message.compid;
+      rosmavlink_msg.msgid = message.msgid;
 
-			      for(sensor_msgs::Imu::_angular_velocity_covariance_type::iterator it=imu_msg->angular_velocity_covariance.begin(); it != imu_msg->angular_velocity_covariance.end(); ++it)
-			        *it = 0;
+      for (int i = 0; i < message.len / 8; i++)
+      {
+        (rosmavlink_msg.payload64).push_back(message.payload64[i]);
+      }
 
-			      for(sensor_msgs::Imu::_linear_acceleration_covariance_type::iterator it=imu_msg->linear_acceleration_covariance.begin(); it != imu_msg->linear_acceleration_covariance.end(); ++it)
-			        *it = 0;
+      /**
+       * Send the received MAVLink message to ROS (topic: mavlink, see main())
+       */
+      mavlink_pub.publish(rosmavlink_msg);
 
-			      imu_msg->header.frame_id = frame_id;
-			      imu_msg->header.seq = imu_raw.time_usec / 1000;
-			      imu_msg->header.stamp = ros::Time::now();
+      switch (message.msgid)
+      {
+        /*
+         * Message specs (xxx: soon mavlink.org):
+         * https://pixhawk.ethz.ch/mavlink/#ATTITUDE
+         */
+        case MAVLINK_MSG_ID_ATTITUDE:
+        {
+          if (imu_pub.getNumSubscribers() > 0)
+          {
+            mavlink_attitude_t att;
+            mavlink_msg_attitude_decode(&message, &att);
 
-			      imu_pub.publish(imu_msg);
-			    }
-			  }
-				break;
+            sensor_msgs::ImuPtr imu_msg(new sensor_msgs::Imu);
 
-			/* 
-			 * Message specs (xxx: soon mavlink.org):
-			 * https://pixhawk.ethz.ch/mavlink/#HIGHRES_IMU
-			 */
-			case MAVLINK_MSG_ID_HIGHRES_IMU:
-				{
-                                  /* decode message */
-                                  mavlink_msg_highres_imu_decode(&message, &imu_raw);
+            angle2quaternion(att.roll, -att.pitch, -att.yaw, &(imu_msg->orientation.w), &(imu_msg->orientation.x),
+                             &(imu_msg->orientation.y), &(imu_msg->orientation.z));
 
-                                  std_msgs::Header header;
-                                  header.stamp = ros::Time::now();
-                                  header.seq = imu_raw.time_usec / 1000;
-                                  header.frame_id = frame_id;
+            // TODO: check/verify that these are body-fixed
+            imu_msg->angular_velocity.x = att.rollspeed;
+            imu_msg->angular_velocity.y = -att.pitchspeed;
+            imu_msg->angular_velocity.z = -att.yawspeed;
 
-				  if(imu_raw_pub.getNumSubscribers() > 0){
+            // take this from imu high res message, this is supposed to arrive before this one and should pretty much be in sync then
+            imu_msg->linear_acceleration.x = imu_raw.xacc;
+            imu_msg->linear_acceleration.y = -imu_raw.yacc;
+            imu_msg->linear_acceleration.z = -imu_raw.zacc;
 
-				    sensor_msgs::ImuPtr imu_msg(new sensor_msgs::Imu);
+            // TODO: can we fill in the covariance here from a parameter that we set from the specs/experience?
+            for (sensor_msgs::Imu::_orientation_covariance_type::iterator it = imu_msg->orientation_covariance.begin();
+                it != imu_msg->orientation_covariance.end(); ++it)
+              *it = 0;
 
-				    imu_msg->angular_velocity.x = imu_raw.xgyro;
-				    imu_msg->angular_velocity.y = -imu_raw.ygyro;
-				    imu_msg->angular_velocity.z = -imu_raw.zgyro;
+            for (sensor_msgs::Imu::_angular_velocity_covariance_type::iterator it =
+                imu_msg->angular_velocity_covariance.begin(); it != imu_msg->angular_velocity_covariance.end(); ++it)
+              *it = 0;
 
-				    imu_msg->linear_acceleration.x = imu_raw.xacc;
-				    imu_msg->linear_acceleration.y = -imu_raw.yacc;
-				    imu_msg->linear_acceleration.z = -imu_raw.zacc;
+            for (sensor_msgs::Imu::_linear_acceleration_covariance_type::iterator it =
+                imu_msg->linear_acceleration_covariance.begin(); it != imu_msg->linear_acceleration_covariance.end();
+                ++it)
+              *it = 0;
 
-				    // TODO: can we fill in the covariance here from a parameter that we set from the specs/experience?
-				    for(sensor_msgs::Imu::_angular_velocity_covariance_type::iterator it=imu_msg->angular_velocity_covariance.begin(); it != imu_msg->angular_velocity_covariance.end(); ++it)
-				      *it = 0;
+            imu_msg->header.frame_id = frame_id;
+            imu_msg->header.seq = imu_raw.time_usec / 1000;
+            imu_msg->header.stamp = ros::Time::now();
 
-				    for(sensor_msgs::Imu::_linear_acceleration_covariance_type::iterator it=imu_msg->linear_acceleration_covariance.begin(); it != imu_msg->linear_acceleration_covariance.end(); ++it)
-				      *it = 0;
+            imu_pub.publish(imu_msg);
+          }
+        }
+          break;
 
-				    imu_msg->orientation_covariance[0] = -1;
+          /*
+           * Message specs (xxx: soon mavlink.org):
+           * https://pixhawk.ethz.ch/mavlink/#HIGHRES_IMU
+           */
+        case MAVLINK_MSG_ID_HIGHRES_IMU:
+        {
+          /* decode message */
+          mavlink_msg_highres_imu_decode(&message, &imu_raw);
 
-				    imu_msg->header = header;
+          std_msgs::Header header;
+          header.stamp = ros::Time::now();
+          header.seq = imu_raw.time_usec / 1000;
+          header.frame_id = frame_id;
 
-				    imu_raw_pub.publish(imu_msg);
+          if (imu_raw_pub.getNumSubscribers() > 0)
+          {
 
-				    if (verbose)
-				      ROS_INFO_THROTTLE(1, "Published IMU message (sys:%d|comp:%d):\n", message.sysid, message.compid);
-				  }
-				  if(mag_pub.getNumSubscribers() > 0){
-				    const double gauss_to_tesla = 1.0e-4;
-				    sensor_msgs::MagneticFieldPtr mag_msg(new sensor_msgs::MagneticField);
+            sensor_msgs::ImuPtr imu_msg(new sensor_msgs::Imu);
 
-                                    mag_msg->magnetic_field.x = imu_raw.xmag * gauss_to_tesla;
-                                    mag_msg->magnetic_field.y = imu_raw.ymag * gauss_to_tesla;
-                                    mag_msg->magnetic_field.z = imu_raw.zmag * gauss_to_tesla;
+            imu_msg->angular_velocity.x = imu_raw.xgyro;
+            imu_msg->angular_velocity.y = -imu_raw.ygyro;
+            imu_msg->angular_velocity.z = -imu_raw.zgyro;
 
-                                    // TODO: again covariance
-                                    for (sensor_msgs::MagneticField::_magnetic_field_covariance_type::iterator it = mag_msg->magnetic_field_covariance.begin(); it != mag_msg->magnetic_field_covariance.end(); ++it)
-                                      *it = 0;
+            imu_msg->linear_acceleration.x = imu_raw.xacc;
+            imu_msg->linear_acceleration.y = -imu_raw.yacc;
+            imu_msg->linear_acceleration.z = -imu_raw.zacc;
 
-                                    mag_msg->header = header;
-                                    mag_pub.publish(mag_msg);
-				  }
-				  //TODO: pressure, temperature
-				// XXX
-			}
-				break;
+            // TODO: can we fill in the covariance here from a parameter that we set from the specs/experience?
+            for (sensor_msgs::Imu::_angular_velocity_covariance_type::iterator it =
+                imu_msg->angular_velocity_covariance.begin(); it != imu_msg->angular_velocity_covariance.end(); ++it)
+              *it = 0;
 
-			/* 
-			 * Message specs (xxx: soon mavlink.org):
-			 * https://pixhawk.ethz.ch/mavlink/#OPTICAL_FLOW
-			 */
-			case MAVLINK_MSG_ID_OPTICAL_FLOW:
-				{
-					/* decode message */
-					mavlink_optical_flow_t flow;
-					mavlink_msg_optical_flow_decode(&message, &flow);
+            for (sensor_msgs::Imu::_linear_acceleration_covariance_type::iterator it =
+                imu_msg->linear_acceleration_covariance.begin(); it != imu_msg->linear_acceleration_covariance.end();
+                ++it)
+              *it = 0;
 
-					// XXX
-				}
-				break;
+            imu_msg->orientation_covariance[0] = -1;
 
-			}
-		}
-	}
-	return NULL;
+            imu_msg->header = header;
+
+            imu_raw_pub.publish(imu_msg);
+
+            if (verbose)
+              ROS_INFO_THROTTLE(1, "Published IMU message (sys:%d|comp:%d):\n", message.sysid, message.compid);
+          }
+          if (mag_pub.getNumSubscribers() > 0)
+          {
+            const double gauss_to_tesla = 1.0e-4;
+            sensor_msgs::MagneticFieldPtr mag_msg(new sensor_msgs::MagneticField);
+
+            mag_msg->magnetic_field.x = imu_raw.xmag * gauss_to_tesla;
+            mag_msg->magnetic_field.y = imu_raw.ymag * gauss_to_tesla;
+            mag_msg->magnetic_field.z = imu_raw.zmag * gauss_to_tesla;
+
+            // TODO: again covariance
+            for (sensor_msgs::MagneticField::_magnetic_field_covariance_type::iterator it =
+                mag_msg->magnetic_field_covariance.begin(); it != mag_msg->magnetic_field_covariance.end(); ++it)
+              *it = 0;
+
+            mag_msg->header = header;
+            mag_pub.publish(mag_msg);
+          }
+          //TODO: pressure, temperature
+          // XXX
+        }
+          break;
+
+          /*
+           * Message specs (xxx: soon mavlink.org):
+           * https://pixhawk.ethz.ch/mavlink/#OPTICAL_FLOW
+           */
+        case MAVLINK_MSG_ID_OPTICAL_FLOW:
+        {
+          /* decode message */
+          mavlink_optical_flow_t flow;
+          mavlink_msg_optical_flow_decode(&message, &flow);
+
+          // XXX
+        }
+          break;
+
+      }
+    }
+  }
+  return NULL;
 }
-
 
 void mavlinkCallback(const mavlink_ros::Mavlink &mavlink_ros_msg)
 {
 
-	/**
-	 * Convert mavlink_ros::Mavlink to mavlink_message_t
-	 */
-	mavlink_message_t msg;
-	msg.msgid = mavlink_ros_msg.msgid;
+  /**
+   * Convert mavlink_ros::Mavlink to mavlink_message_t
+   */
+  mavlink_message_t msg;
+  msg.msgid = mavlink_ros_msg.msgid;
 
-	static uint8_t mavlink_crcs[] = MAVLINK_MESSAGE_CRCS;
+  static uint8_t mavlink_crcs[] = MAVLINK_MESSAGE_CRCS;
 
-	//Copy payload from mavlink_msg (from ROS) to the new "real" mavlink message
-	copy(mavlink_ros_msg.payload64.begin(), mavlink_ros_msg.payload64.end(), msg.payload64);
+  //Copy payload from mavlink_msg (from ROS) to the new "real" mavlink message
+  copy(mavlink_ros_msg.payload64.begin(), mavlink_ros_msg.payload64.end(), msg.payload64);
 
-	mavlink_finalize_message_chan(&msg, mavlink_ros_msg.sysid, mavlink_ros_msg.compid, MAVLINK_COMM_0, mavlink_ros_msg.len, mavlink_crcs[msg.msgid]);
+  mavlink_finalize_message_chan(&msg, mavlink_ros_msg.sysid, mavlink_ros_msg.compid, MAVLINK_COMM_0,
+                                mavlink_ros_msg.len, mavlink_crcs[msg.msgid]);
 
-	/**
-	 * Send mavlink_message to UART
-	 */
-	if (verbose) ROS_INFO("Sent Mavlink from ROS to UART, Message-ID: [%i]", mavlink_ros_msg.msgid);
+  /**
+   * Send mavlink_message to UART
+   */
+  if (verbose)
+    ROS_INFO("Sent Mavlink from ROS to UART, Message-ID: [%i]", mavlink_ros_msg.msgid);
 
-	// Send message over serial port
-	static uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
-	int messageLength = mavlink_msg_to_send_buffer(buffer, &msg);
-	if (debug) printf("Writing %d bytes\n", messageLength);
-	int written = write(fd, (char*)buffer, messageLength);
-	tcflush(fd, TCOFLUSH);
-	if (messageLength != written) fprintf(stderr, "ERROR: Wrote %d bytes but should have written %d\n", written, messageLength);
+  // Send message over serial port
+  static uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
+  int messageLength = mavlink_msg_to_send_buffer(buffer, &msg);
+  if (debug)
+    printf("Writing %d bytes\n", messageLength);
+  int written = write(fd, (char*)buffer, messageLength);
+  tcflush(fd, TCOFLUSH);
+  if (messageLength != written)
+    fprintf(stderr, "ERROR: Wrote %d bytes but should have written %d\n", written, messageLength);
 }
 
-int main(int argc, char **argv) {
-	ros::init(argc, argv, "mavlink_ros_serial");
+int main(int argc, char **argv)
+{
+  ros::init(argc, argv, "mavlink_ros_serial");
 
-	// Handling Program options
-	static GOptionEntry entries[] =
-	{
-			{ "portname", 'p', 0, G_OPTION_ARG_STRING, &port, "Serial port name", port.c_str() },
-			{ "baudrate", 'b', 0, G_OPTION_ARG_INT, &baud, "Baudrate", "115200" },
-			{ "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose, "Be verbose", NULL },
-			{ "debug", 'd', 0, G_OPTION_ARG_NONE, &debug, "Debug output", NULL },
-			{ "sysid", 'a', 0, G_OPTION_ARG_INT, &sysid, "ID of this system, 1-255", "42" },
-			{ "compid", 'c', 0, G_OPTION_ARG_INT, &compid, "ID of this component, 1-255", "199" },
-			{ NULL, 0, 0, G_OPTION_ARG_NONE, NULL, NULL, 0 }
-	};
+  // Handling Program options
+  static GOptionEntry entries[] = { {"portname", 'p', 0, G_OPTION_ARG_STRING, &port, "Serial port name", port.c_str()},
+                                   {"baudrate", 'b', 0, G_OPTION_ARG_INT, &baud, "Baudrate", "115200"}, {
+                                       "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose, "Be verbose", NULL},
+                                   {"debug", 'd', 0, G_OPTION_ARG_NONE, &debug, "Debug output", NULL}, {
+                                       "sysid", 'a', 0, G_OPTION_ARG_INT, &sysid, "ID of this system, 1-255", "42"},
+                                   {"compid", 'c', 0, G_OPTION_ARG_INT, &compid, "ID of this component, 1-255", "199"},
+                                   {NULL, 0, 0, G_OPTION_ARG_NONE, NULL, NULL, 0}};
 
-	GError *error = NULL;
-	GOptionContext *context;
+  GError *error = NULL;
+  GOptionContext *context;
 
-	context = g_option_context_new ("- translate MAVLink messages between ROS to serial port");
-	g_option_context_add_main_entries (context, entries, NULL);
-	//g_option_context_add_group (context, NULL);
-	if (!g_option_context_parse (context, &argc, &argv, &error))
-	{
-		g_print ("Option parsing failed: %s\n", error->message);
-		exit (1);
-	}
+  context = g_option_context_new("- translate MAVLink messages between ROS to serial port");
+  g_option_context_add_main_entries(context, entries, NULL);
+  //g_option_context_add_group (context, NULL);
+  if (!g_option_context_parse(context, &argc, &argv, &error))
+  {
+    g_print("Option parsing failed: %s\n", error->message);
+    exit(1);
+  }
 
-	// SETUP SERIAL PORT
+  // SETUP SERIAL PORT
 
-	// Exit if opening port failed
-	// Open the serial port.
-	if (!silent) printf("Trying to connect to %s.. ", port.c_str());
-	fd = open_port(port);
-	if (fd == -1)
-	{
-		if (!silent) fprintf(stderr, "failure, could not open port.\n");
-		exit(EXIT_FAILURE);
-	}
-	else
-	{
-		if (!silent) printf("success.\n");
-	}
-	if (!silent) printf("Trying to configure %s.. ", port.c_str());
-	bool setup = setup_port(fd, baud, 8, 1, false, false);
-	if (!setup)
-	{
-		if (!silent) fprintf(stderr, "failure, could not configure port.\n");
-		exit(EXIT_FAILURE);
-	}
-	else
-	{
-		if (!silent) printf("success.\n");
-	}
-	int* fd_ptr = &fd;
+  // Exit if opening port failed
+  // Open the serial port.
+  if (!silent)
+    printf("Trying to connect to %s.. ", port.c_str());
+  fd = open_port(port);
+  if (fd == -1)
+  {
+    if (!silent)
+      fprintf(stderr, "failure, could not open port.\n");
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    if (!silent)
+      printf("success.\n");
+  }
+  if (!silent)
+    printf("Trying to configure %s.. ", port.c_str());
+  bool setup = setup_port(fd, baud, 8, 1, false, false);
+  if (!setup)
+  {
+    if (!silent)
+      fprintf(stderr, "failure, could not configure port.\n");
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    if (!silent)
+      printf("success.\n");
+  }
+  int* fd_ptr = &fd;
 
+  // SETUP ROS
+  ros::NodeHandle mavlink_nh("/mavlink"); // always root namespace since I assume it's somewhat "broadcast"
+  mavlink_sub = mavlink_nh.subscribe("to", 1000, mavlinkCallback);
+  mavlink_pub = mavlink_nh.advertise<mavlink_ros::Mavlink>("from", 1000);
 
-	// SETUP ROS
-	ros::NodeHandle mavlink_nh("/mavlink"); // always root namespace since I assume it's somewhat "broadcast"
-	mavlink_sub = mavlink_nh.subscribe("to", 1000, mavlinkCallback);
-	mavlink_pub = mavlink_nh.advertise<mavlink_ros::Mavlink> ("from", 1000);
+  ros::NodeHandle nh("fcu");
+  imu_pub = nh.advertise<sensor_msgs::Imu>("imu", 10);
+  mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag", 10);
 
-	ros::NodeHandle nh("fcu");
-        imu_pub = nh.advertise<sensor_msgs::Imu>("imu", 10);
-        mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag", 10);
+  ros::NodeHandle raw_nh("fcu/raw");
+  imu_raw_pub = nh.advertise<sensor_msgs::Imu>("imu", 10);
 
-        ros::NodeHandle raw_nh("fcu/raw");
-        imu_raw_pub = nh.advertise<sensor_msgs::Imu>("imu", 10);
+  GThread* serial_thread;
+  GError* err;
+  if (!g_thread_supported())
+  {
+    g_thread_init(NULL);
+    // Only initialize g thread if not already done
+  }
 
-	GThread* serial_thread;
-	GError* err;
-	if( !g_thread_supported() )
-	{
-		g_thread_init(NULL);
-		// Only initialize g thread if not already done
-	}
+  // Run indefinitely while the ROS and serial threads handle the data
+  if (!silent)
+    printf("\nREADY, waiting for serial/ROS data.\n");
 
-	// Run indefinitely while the ROS and serial threads handle the data
-	if (!silent) printf("\nREADY, waiting for serial/ROS data.\n");
+  if ((serial_thread = g_thread_create((GThreadFunc)serial_wait, (void *)fd_ptr, TRUE, &err)) == NULL)
+  {
+    printf("Failed to create serial handling thread: %s!!\n", err->message);
+    g_error_free(err);
+  }
 
-	if( (serial_thread = g_thread_create((GThreadFunc)serial_wait, (void *)fd_ptr, TRUE, &err)) == NULL)
-	{
-		printf("Failed to create serial handling thread: %s!!\n", err->message );
-		g_error_free ( err ) ;
-	}
+  int noErrors = 0;
+  if (fd == -1 || fd == 0)
+  {
+    if (!silent)
+      fprintf(stderr, "Connection attempt to port %s with %d baud, 8N1 failed, exiting.\n", port.c_str(), baud);
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    if (!silent)
+      fprintf(stderr, "\nConnected to %s with %d baud, 8 data bits, no parity, 1 stop bit (8N1)\n", port.c_str(), baud);
+  }
 
-	int noErrors = 0;
-	if (fd == -1 || fd == 0)
-	{
-		if (!silent) fprintf(stderr, "Connection attempt to port %s with %d baud, 8N1 failed, exiting.\n", port.c_str(), baud);
-		exit(EXIT_FAILURE);
-	}
-	else
-	{
-		if (!silent) fprintf(stderr, "\nConnected to %s with %d baud, 8 data bits, no parity, 1 stop bit (8N1)\n", port.c_str(), baud);
-	}
-	
-	// FIXME ADD MORE CONNECTION ATTEMPTS
-	
-	if(fd == -1 || fd == 0)
-	{
-		exit(noErrors);
-	}
-	
-	// Ready to roll
-	printf("\nMAVLINK SERIAL TO ROS BRIDGE STARTED ON MAV %d (COMPONENT ID:%d) - RUNNING..\n\n", sysid, compid);
-	
+  // FIXME ADD MORE CONNECTION ATTEMPTS
 
-	/**
-	 * Now pump callbacks (execute mavlinkCallback) until CTRL-c is pressed
-	 */
-	ros::spin();
-	
-	
-	close_port(fd);
-	
-	//g_thread_join(serial_thread);
-	//exit(0);
+  if (fd == -1 || fd == 0)
+  {
+    exit(noErrors);
+  }
 
-	return 0;
+  // Ready to roll
+  printf("\nMAVLINK SERIAL TO ROS BRIDGE STARTED ON MAV %d (COMPONENT ID:%d) - RUNNING..\n\n", sysid, compid);
+
+  /**
+   * Now pump callbacks (execute mavlinkCallback) until CTRL-c is pressed
+   */
+  ros::spin();
+
+  close_port(fd);
+
+  //g_thread_join(serial_thread);
+  //exit(0);
+
+  return 0;
 }
