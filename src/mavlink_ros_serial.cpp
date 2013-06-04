@@ -36,6 +36,9 @@
 
 #include "mavlink_ros/Mavlink.h"
 #include "sensor_msgs/Imu.h"
+#include "sensor_msgs/MagneticField.h"
+#include "sensor_msgs/Temperature.h"
+#include "sensor_msgs/FluidPressure.h"
 
 #include "mavlink.h"
 #include <glib.h>
@@ -87,7 +90,36 @@ int fd;
 
 ros::Subscriber mavlink_sub;
 ros::Publisher mavlink_pub;
-ros::Publisher attitude_pub;
+ros::Publisher imu_pub;
+ros::Publisher imu_raw_pub;
+ros::Publisher mag_pub;
+ros::Publisher pressure_pub;
+
+mavlink_highres_imu_t imu_raw;
+std::string frame_id("fcu");
+
+// from asctec_hl_interface
+inline void angle2quaternion(const double &roll, const double &pitch, const double &yaw, double *w, double *x,
+                             double *y, double *z)
+{
+  double sR2, cR2, sP2, cP2, sY2, cY2;
+  sincos(roll * 0.5, &sR2, &cR2);
+  sincos(pitch * 0.5, &sP2, &cP2);
+  sincos(yaw * 0.5, &sY2, &cY2);
+
+  // TODO: change rotation order
+  // this follows AscTec's pre- 2012 firmware rotation order: Rz*Rx*Ry
+//  *w = cP2 * cR2 * cY2 - sP2 * sR2 * sY2;
+//  *x = cP2 * cY2 * sR2 - cR2 * sP2 * sY2;
+//  *y = cR2 * cY2 * sP2 + cP2 * sR2 * sY2;
+//  *z = cP2 * cR2 * sY2 + cY2 * sP2 * sR2;
+
+  // Rz*Ry*Rx for 2012 firmware on the:
+  *w = cP2 * cR2 * cY2 + sP2 * sR2 * sY2;
+  *x = cP2 * cY2 * sR2 - cR2 * sP2 * sY2;
+  *y = cR2 * cY2 * sP2 + cP2 * sR2 * sY2;
+  *z = cP2 * cR2 * sY2 - cY2 * sP2 * sR2;
+}
 
 /**
  *
@@ -366,24 +398,43 @@ void* serial_wait(void* serial_ptr)
 			 * Message specs (xxx: soon mavlink.org):
 			 * https://pixhawk.ethz.ch/mavlink/#ATTITUDE
 			 */
-			case MAVLINK_MSG_ID_ATTITUDE:
-				{
-					sensor_msgs::Imu imu_msg;
+			  case MAVLINK_MSG_ID_ATTITUDE:
+			  {
+			    if(imu_pub.getNumSubscribers()>0){
+			      mavlink_attitude_t att;
+			      mavlink_msg_attitude_decode(&message, &att);
 
-					/* decode message */
-					mavlink_attitude_t att;
-					mavlink_msg_attitude_decode(&message, &att);
+			      sensor_msgs::ImuPtr imu_msg(new sensor_msgs::Imu);
 
-					/* att struct now filled with data */
-					//convertMavlinkAttitudeToROS(&message, imu_msg);
+			      angle2quaternion(att.roll, -att.pitch, -att.yaw, &(imu_msg->orientation.w), &(imu_msg->orientation.x), &(imu_msg->orientation.y), &(imu_msg->orientation.z));
 
-					// SCHOOOOOF
+			      // TODO: check/verify that these are body-fixed
+			      imu_msg->angular_velocity.x = att.rollspeed;
+			      imu_msg->angular_velocity.y = -att.pitchspeed;
+			      imu_msg->angular_velocity.z = -att.yawspeed;
 
-					attitude_pub.publish(imu_msg);
+			      // take this from imu high res message, this is supposed to arrive before this one and should pretty much be in sync then
+			      imu_msg->linear_acceleration.x = imu_raw.xacc;
+			      imu_msg->linear_acceleration.y = -imu_raw.yacc;
+			      imu_msg->linear_acceleration.z = -imu_raw.zacc;
 
-					if (verbose)
-						ROS_INFO("Published IMU message (sys:%d|comp:%d):\n", message.sysid, message.compid);
-				}
+			      // TODO: can we fill in the covariance here from a parameter that we set from the specs/experience?
+			      for(sensor_msgs::Imu::_orientation_covariance_type::iterator it=imu_msg->orientation_covariance.begin(); it != imu_msg->orientation_covariance.end(); ++it)
+			        *it = 0;
+
+			      for(sensor_msgs::Imu::_angular_velocity_covariance_type::iterator it=imu_msg->angular_velocity_covariance.begin(); it != imu_msg->angular_velocity_covariance.end(); ++it)
+			        *it = 0;
+
+			      for(sensor_msgs::Imu::_linear_acceleration_covariance_type::iterator it=imu_msg->linear_acceleration_covariance.begin(); it != imu_msg->linear_acceleration_covariance.end(); ++it)
+			        *it = 0;
+
+			      imu_msg->header.frame_id = frame_id;
+			      imu_msg->header.seq = imu_raw.time_usec / 1000;
+			      imu_msg->header.stamp = ros::Time::now();
+
+			      imu_pub.publish(imu_msg);
+			    }
+			  }
 				break;
 
 			/* 
@@ -392,12 +443,60 @@ void* serial_wait(void* serial_ptr)
 			 */
 			case MAVLINK_MSG_ID_HIGHRES_IMU:
 				{
-					/* decode message */
-					mavlink_highres_imu_t raw;
-					mavlink_msg_highres_imu_decode(&message, &raw);
+                                  /* decode message */
+                                  mavlink_msg_highres_imu_decode(&message, &imu_raw);
 
-					// XXX
-				}
+                                  std_msgs::Header header;
+                                  header.stamp = ros::Time::now();
+                                  header.seq = imu_raw.time_usec / 1000;
+                                  header.frame_id = frame_id;
+
+				  if(imu_raw_pub.getNumSubscribers() > 0){
+
+				    sensor_msgs::ImuPtr imu_msg(new sensor_msgs::Imu);
+
+				    imu_msg->angular_velocity.x = imu_raw.xgyro;
+				    imu_msg->angular_velocity.y = -imu_raw.ygyro;
+				    imu_msg->angular_velocity.z = -imu_raw.zgyro;
+
+				    imu_msg->linear_acceleration.x = imu_raw.xacc;
+				    imu_msg->linear_acceleration.y = -imu_raw.yacc;
+				    imu_msg->linear_acceleration.z = -imu_raw.zacc;
+
+				    // TODO: can we fill in the covariance here from a parameter that we set from the specs/experience?
+				    for(sensor_msgs::Imu::_angular_velocity_covariance_type::iterator it=imu_msg->angular_velocity_covariance.begin(); it != imu_msg->angular_velocity_covariance.end(); ++it)
+				      *it = 0;
+
+				    for(sensor_msgs::Imu::_linear_acceleration_covariance_type::iterator it=imu_msg->linear_acceleration_covariance.begin(); it != imu_msg->linear_acceleration_covariance.end(); ++it)
+				      *it = 0;
+
+				    imu_msg->orientation_covariance[0] = -1;
+
+				    imu_msg->header = header;
+
+				    imu_raw_pub.publish(imu_msg);
+
+				    if (verbose)
+				      ROS_INFO_THROTTLE(1, "Published IMU message (sys:%d|comp:%d):\n", message.sysid, message.compid);
+				  }
+				  if(mag_pub.getNumSubscribers() > 0){
+				    const double gauss_to_tesla = 1.0e-4;
+				    sensor_msgs::MagneticFieldPtr mag_msg(new sensor_msgs::MagneticField);
+
+                                    mag_msg->magnetic_field.x = imu_raw.xmag * gauss_to_tesla;
+                                    mag_msg->magnetic_field.y = imu_raw.ymag * gauss_to_tesla;
+                                    mag_msg->magnetic_field.z = imu_raw.zmag * gauss_to_tesla;
+
+                                    // TODO: again covariance
+                                    for (sensor_msgs::MagneticField::_magnetic_field_covariance_type::iterator it = mag_msg->magnetic_field_covariance.begin(); it != mag_msg->magnetic_field_covariance.end(); ++it)
+                                      *it = 0;
+
+                                    mag_msg->header = header;
+                                    mag_pub.publish(mag_msg);
+				  }
+				  //TODO: pressure, temperature
+				// XXX
+			}
 				break;
 
 			/* 
@@ -508,11 +607,16 @@ int main(int argc, char **argv) {
 
 
 	// SETUP ROS
-	ros::NodeHandle n;
-	mavlink_sub = n.subscribe("/toMAVLINK", 1000, mavlinkCallback);
-	mavlink_pub = n.advertise<mavlink_ros::Mavlink> ("/fromMAVLINK", 1000);
-	ros::NodeHandle attitude_nh;
-	attitude_pub = attitude_nh.advertise<sensor_msgs::Imu>("/fromMAVLINK/Imu", 1000);
+	ros::NodeHandle mavlink_nh("/mavlink"); // always root namespace since I assume it's somewhat "broadcast"
+	mavlink_sub = mavlink_nh.subscribe("to", 1000, mavlinkCallback);
+	mavlink_pub = mavlink_nh.advertise<mavlink_ros::Mavlink> ("from", 1000);
+
+	ros::NodeHandle nh("fcu");
+        imu_pub = nh.advertise<sensor_msgs::Imu>("imu", 10);
+        mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag", 10);
+
+        ros::NodeHandle raw_nh("fcu/raw");
+        imu_raw_pub = nh.advertise<sensor_msgs::Imu>("imu", 10);
 
 	GThread* serial_thread;
 	GError* err;
