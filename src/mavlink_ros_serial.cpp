@@ -634,7 +634,7 @@ int main(int argc, char **argv)
   mag_pub = nh.advertise<sensor_msgs::MagneticField>("mag", 10);
 
   ros::NodeHandle raw_nh("fcu/raw");
-  imu_raw_pub = nh.advertise<sensor_msgs::Imu>("imu", 10);
+  imu_raw_pub = raw_nh.advertise<sensor_msgs::Imu>("imu", 10);
 
   GThread* serial_thread;
   GError* err;
