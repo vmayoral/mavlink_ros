@@ -10,7 +10,7 @@ ROS is documented at:
 http://ros.org
 
 ================================================================================
-INSTALLATION:
+INSTALLATION (updated for catkin):
 ================================================================================
 
 This ROS node depends on the glib library. Install it with:
@@ -42,9 +42,99 @@ This ROS node depends on the glib library. Install it with:
 
    source ~/.bashrc
 
-# Build the package with rosmake
+# Build the package with catkin 
 
-   rosmake mavlink_ros
+   cd <catkin_worspace>/src
+   catkin_make
+
+-----
+
+Example:
+
+```bash
+cd  ~/catkin_ws/
+root@erlerobot:~/catkin_ws# catkin_make
+Base path: /root/catkin_ws
+Source space: /root/catkin_ws/src
+Build space: /root/catkin_ws/build
+Devel space: /root/catkin_ws/devel
+Install space: /root/catkin_ws/install
+####
+#### Running command: "cmake /root/catkin_ws/src -DCATKIN_DEVEL_PREFIX=/root/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/root/catkin_ws/install" in "/root/catkin_ws/build"
+####
+-- Using CATKIN_DEVEL_PREFIX: /root/catkin_ws/devel
+-- Using CMAKE_PREFIX_PATH: /root/catkin_ws/devel;/opt/ros/groovy
+-- This workspace overlays: /root/catkin_ws/devel;/opt/ros/groovy
+-- Found gtest sources under '/usr/src/gtest': gtests will be built
+-- Using CATKIN_TEST_RESULTS_DIR: /root/catkin_ws/build/test_results
+-- catkin 0.5.65
+-- BUILD_SHARED_LIBS is on
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- ~~  traversing 2 packages in topological order:
+-- ~~  - erle_beginner_tutorials
+-- ~~  - mavlink_ros
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- +++ processing catkin package: 'erle_beginner_tutorials'
+-- ==> add_subdirectory(erle_beginner_tutorials)
+-- +++ processing catkin package: 'mavlink_ros'
+-- ==> add_subdirectory(mavlink_ros)
+-- WARNING: you are using the obsolete 'PKGCONFIG' macro, use FindPkgConfig
+-- Found GLIB2: /usr/lib/arm-linux-gnueabihf/libglib-2.0.so 
+-- WARNING: you are using the obsolete 'PKGCONFIG' macro, use FindPkgConfig
+-- Found GTHREAD2: /usr/lib/arm-linux-gnueabihf/libgthread-2.0.so 
+-- mavlink_ros: 1 messages, 0 services
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /root/catkin_ws/build
+####
+#### Running command: "make -j1 -l1" in "/root/catkin_ws/build"
+####
+-- Using CATKIN_DEVEL_PREFIX: /root/catkin_ws/devel
+-- Using CMAKE_PREFIX_PATH: /root/catkin_ws/devel;/opt/ros/groovy
+-- This workspace overlays: /root/catkin_ws/devel;/opt/ros/groovy
+-- Found gtest sources under '/usr/src/gtest': gtests will be built
+-- Using CATKIN_TEST_RESULTS_DIR: /root/catkin_ws/build/test_results
+-- catkin 0.5.65
+-- BUILD_SHARED_LIBS is on
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- ~~  traversing 2 packages in topological order:
+-- ~~  - erle_beginner_tutorials
+-- ~~  - mavlink_ros
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- +++ processing catkin package: 'erle_beginner_tutorials'
+-- ==> add_subdirectory(erle_beginner_tutorials)
+-- +++ processing catkin package: 'mavlink_ros'
+-- ==> add_subdirectory(mavlink_ros)
+-- WARNING: you are using the obsolete 'PKGCONFIG' macro, use FindPkgConfig
+-- WARNING: you are using the obsolete 'PKGCONFIG' macro, use FindPkgConfig
+-- mavlink_ros: 1 messages, 0 services
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /root/catkin_ws/build
+Scanning dependencies of target mavlink_ros_gencpp
+make[2]: Warning: File `/opt/ros/groovy/share/std_msgs/msg/Header.msg' has modification time 4.1e+08 s in the future
+[ 20%] Generating C++ code from mavlink_ros/Mavlink.msg
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 20%] Built target mavlink_ros_gencpp
+Scanning dependencies of target mavlink_ros_genlisp
+make[2]: Warning: File `/opt/ros/groovy/share/std_msgs/msg/Header.msg' has modification time 4.1e+08 s in the future
+[ 40%] Generating Lisp code from mavlink_ros/Mavlink.msg
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 40%] Built target mavlink_ros_genlisp
+Scanning dependencies of target mavlink_ros_genpy
+make[2]: Warning: File `/opt/ros/groovy/share/std_msgs/msg/Header.msg' has modification time 4.1e+08 s in the future
+[ 60%] Generating Python from MSG mavlink_ros/Mavlink
+[ 80%] Generating Python msg __init__.py for mavlink_ros
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+[ 80%] Built target mavlink_ros_genpy
+Scanning dependencies of target mavlink_ros_serial
+make[2]: Warning: File `/opt/ros/groovy/include/XmlRpcDecl.h' has modification time 4.2e+08 s in the future
+[100%] Building CXX object mavlink_ros/CMakeFiles/mavlink_ros_serial.dir/src/mavlink_ros_serial.cpp.o
+Linking CXX executable /root/catkin_ws/devel/lib/mavlink_ros/mavlink_ros_serial
+make[2]: warning:  Clock skew detected.  Your build may be incomplete.
+```
+
+----
 
 
 ================================================================================
